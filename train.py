@@ -72,7 +72,6 @@ def train():
                     pred = [[] for _ in range(BATCH_SIZE)]
                 enc_out = enc(x, mask)
                 dec_in = LongTensor([SOS_IDX] * BATCH_SIZE).unsqueeze(1)
-                print(y.size(1))
                 for t in range(y.size(1)):
                     dec_out = dec(enc_out, dec_in, mask)
                     loss = F.nll_loss(dec_out, y[:, t], size_average = False, ignore_index = PAD_IDX)
