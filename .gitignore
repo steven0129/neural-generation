@@ -2,3 +2,6 @@ neural_generation.*
 pair
 pair*
 __pycache__/
+log.txt
+predict.py
+test.py
