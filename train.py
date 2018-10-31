@@ -93,7 +93,7 @@ def train():
                 del total_loss
             timer = time.time() - timer
             loss_sum /= len(data)
-            LOG.write(f'epoch = {ei}, loss_sum={loss_sum}')
+            LOG.write(f'epoch = {ei}, loss_sum = {loss_sum}\n')
             if ei % SAVE_EVERY and ei != epoch + num_epochs:
                 save_checkpoint("", None, None, ei, loss_sum, timer)
             else:

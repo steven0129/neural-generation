@@ -1,24 +1,31 @@
 import re
 import jieba
+import functools
 from model import *
 
 jieba.load_userdict('dict-traditional.txt')
 jieba.load_userdict('sky_dragon_name.txt')
 
-def normalize(x):
-    x = re.sub("[^ a-zA-Z0-9\uAC00-\uD7A3]+", " ", x)
-    x = re.sub("\s+", " ", x)
-    x = re.sub("^ | $", "", x)
-    x = x.lower()
-    return x
+def normalize(x, y):
+    if y== '，' or y == '。' or y == '：' or y == '「' or y == '」' or y == '！' or y == '？' or y == '‘' or y == '’':
+        return x + y
+    
+    return y
 
 def tokenize(x, unit):
-    # x = normalize(x)
     if unit == "char":
         x = re.sub(" ", "", x)
         return list(x)
     if unit == "word":
-        return jieba.lcut(x)
+        result = []
+        for xx in jieba.cut(x):
+            if xx == '，' or xx == '。' or xx == '：' or xx == '「' or xx == '」' or xx == '！' or xx == '？' or xx == '‘' or xx == '’':
+                if len(result) != 0:
+                    result[-1] += xx
+            else:
+                result.append(xx)
+        
+        return result
 
 def load_vocab(filename, ext):
     print("loading vocab.%s..." % ext)
