@@ -5,3 +5,5 @@ __pycache__/
 log.txt
 predict.py
 test.py
+*.epoch*
+*.csv*

@@ -18,12 +18,15 @@ def tokenize(x, unit):
         return list(x)
     if unit == "word":
         result = []
-        for xx in jieba.cut(x):
-            if xx == '，' or xx == '。' or xx == '：' or xx == '「' or xx == '」' or xx == '！' or xx == '？' or xx == '‘' or xx == '’':
-                if len(result) != 0:
-                    result[-1] += xx
-            else:
+        for xx in jieba.cut(x.strip()):
+            # if xx== ' ' or xx == '，' or xx == '。' or xx == '：' or xx == '「' or xx == '」' or xx == '！' or xx == '？' or xx == '‘' or xx == '’':
+            if xx != ' ' or x != '　' or xx != '':
                 result.append(xx)
+                # if xx == ' ' or x== '　':
+                #     if len(result) != 0:
+                #         result[-1] += xx
+                # else:
+                #     result.append(xx)
         
         return result
 

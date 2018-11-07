@@ -56,52 +56,61 @@ def train():
     epoch = load_checkpoint(sys.argv[1], enc, dec) if isfile(sys.argv[1]) else 0
     filename = re.sub("\.epoch[0-9]+$", "", sys.argv[1])
     print("training model...")
-    with open('log.txt', 'a+') as LOG:
-        for ei in range(epoch + 1, epoch + num_epochs + 1):
-            ii = 0
-            loss_sum = 0
-            timer = time.time()
-            for x, y in data:
-                ii += 1
-                loss = 0
-                total_loss = 0
-                enc.zero_grad()
-                dec.zero_grad()
-                mask = mask_pad(x)
-                if VERBOSE:
-                    pred = [[] for _ in range(BATCH_SIZE)]
-                enc_out = enc(x, mask)
-                dec_in = LongTensor([SOS_IDX] * BATCH_SIZE).unsqueeze(1)
-                for t in range(y.size(1)):
-                    dec_out = dec(enc_out, dec_in, mask)
-                    loss = F.nll_loss(dec_out, y[:, t], size_average = False, ignore_index = PAD_IDX)
-                    total_loss += loss.item()
-                    loss.backward(retain_graph=True)
-                    del loss
+    
+    for ei in range(epoch + 1, epoch + num_epochs + 1):
+        ii = 0
+        loss_sum = 0
+        timer = time.time()
+        
+        for x, y in data:
+            ii += 1
+            loss = 0
+            total_loss = 0
+            enc.zero_grad()
+            dec.zero_grad()
+            mask = mask_pad(x)
+            if VERBOSE:
+                pred = [[] for _ in range(BATCH_SIZE)]
+            enc_out = enc(x, mask)
+            dec_in = LongTensor([SOS_IDX] * BATCH_SIZE).unsqueeze(1)
+            for t in range(y.size(1)):
+                dec_out = dec(enc_out, dec_in, mask)
+                loss = F.nll_loss(dec_out, y[:, t], size_average = False, ignore_index = PAD_IDX)
+                total_loss += loss.item()
+                loss.backward(retain_graph=True)
+                del loss
 
-                    dec_in = torch.cat((dec_in, y[:, t].unsqueeze(1)), 1) # teacher forcing
-                    if VERBOSE:
-                        for i, j in enumerate(dec_out.data.topk(1)[1]):
-                            pred[i].append(scalar(j))
-                
-                total_loss /= y.data.gt(0).sum().float() # divide by the number of unpadded tokens
-                enc_optim.step()
-                dec_optim.step()
-                total_loss = scalar(total_loss)
-                loss_sum += total_loss
-                print("epoch = %d, iteration = %d, loss = %f" % (ei, ii, total_loss))
-                del total_loss
-            timer = time.time() - timer
-            loss_sum /= len(data)
-            LOG.write(f'epoch = {ei}, loss_sum = {loss_sum}\n')
-            if ei % SAVE_EVERY and ei != epoch + num_epochs:
-                save_checkpoint("", None, None, ei, loss_sum, timer)
-            else:
+                dec_in = torch.cat((dec_in, y[:, t].unsqueeze(1)), 1) # teacher forcing
                 if VERBOSE:
-                    for x, y in zip(x, pred):
-                        print(" ".join([src_itow[scalar(i)] for i in x if scalar(i) != PAD_IDX]))
-                        print(" ".join([tgt_itow[i] for i in y if i != PAD_IDX]))
-                save_checkpoint(filename, enc, dec, ei, loss_sum, timer)
+                    for i, j in enumerate(dec_out.data.topk(1)[1]):
+                        pred[i].append(scalar(j))
+                
+            total_loss /= y.data.gt(0).sum().float() # divide by the number of unpadded tokens
+            enc_optim.step()
+            dec_optim.step()
+            total_loss = scalar(total_loss)
+            loss_sum += total_loss
+            print("epoch = %d, iteration = %d, loss = %f" % (ei, ii, total_loss))
+            
+            with open('log.txt', 'a+') as LOG:
+                LOG.write(f'epoch = {ei}, iteration = {ii}, loss = {total_loss}\n')
+            
+            del total_loss
+        
+        timer = time.time() - timer
+        loss_sum /= len(data)
+        
+        with open('log.txt', 'a+') as LOG:
+            LOG.write(f'epoch = {ei}, loss_sum = {loss_sum}\n')
+        
+        if ei % SAVE_EVERY and ei != epoch + num_epochs:
+            save_checkpoint("", None, None, ei, loss_sum, timer)
+        else:
+            if VERBOSE:
+                for x, y in zip(x, pred):
+                    print(" ".join([src_itow[scalar(i)] for i in x if scalar(i) != PAD_IDX]))
+                    print(" ".join([tgt_itow[i] for i in y if i != PAD_IDX]))
+            save_checkpoint(filename, enc, dec, ei, loss_sum, timer)
 
 if __name__ == "__main__":
     if len(sys.argv) != 6:

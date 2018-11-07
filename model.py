@@ -11,7 +11,7 @@ DK = EMBED_SIZE // NUM_HEADS # dimension of key
 DV = EMBED_SIZE // NUM_HEADS # dimension of value
 DROPOUT = 0.5
 VERBOSE = True
-SAVE_EVERY = 10
+SAVE_EVERY = 1
 
 PAD = "<PAD>" # padding
 EOS = "<EOS>" # end of sequence
