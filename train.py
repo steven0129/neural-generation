@@ -6,6 +6,34 @@ from utils import *
 from os.path import isfile
 from torch.autograd import Variable
 
+class NoamOpt:
+    "Optim wrapper that implements rate."
+    def __init__(self, model_size, factor, warmup, optimizer):
+        self.optimizer = optimizer
+        self._step = 0
+        self.warmup = warmup
+        self.factor = factor
+        self.model_size = model_size
+        self._rate = 0
+        
+    def step(self):
+        "Update parameters and rate"
+        self._step += 1
+        rate = self.rate()
+        for p in self.optimizer.param_groups:
+            p['lr'] = rate
+        self._rate = rate
+        self.optimizer.step()
+        
+    def rate(self, step = None):
+        "Implement `lrate` above"
+        if step is None:
+            step = self._step
+        return self.factor * (self.model_size ** (-0.5) * min(step ** (-0.5), step * self.warmup ** (-1.5)))
+
+def get_std_opt(model):
+    return NoamOpt(EMBED_SIZE, 2, 4000, torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
+
 def load_data():
     data = []
     src_batch = []
@@ -51,8 +79,8 @@ def train():
         tgt_itow = [w for w, _ in sorted(tgt_vocab.items(), key = lambda x: x[1])]
     enc = encoder(len(src_vocab))
     dec = decoder(len(tgt_vocab))
-    enc_optim = torch.optim.Adam(enc.parameters())
-    dec_optim = torch.optim.Adam(dec.parameters())
+    enc_optim = get_std_opt(enc)
+    dec_optim = get_std_opt(dec)
     epoch = load_checkpoint(sys.argv[1], enc, dec) if isfile(sys.argv[1]) else 0
     filename = re.sub("\.epoch[0-9]+$", "", sys.argv[1])
     print("training model...")
@@ -66,8 +94,8 @@ def train():
             ii += 1
             loss = 0
             total_loss = 0
-            enc.zero_grad()
-            dec.zero_grad()
+            enc_optim.optimizer.zero_grad()
+            dec_optim.optimizer.zero_grad()
             mask = mask_pad(x)
             if VERBOSE:
                 pred = [[] for _ in range(BATCH_SIZE)]
@@ -75,7 +103,20 @@ def train():
             dec_in = LongTensor([SOS_IDX] * BATCH_SIZE).unsqueeze(1)
             for t in range(y.size(1)):
                 dec_out = dec(enc_out, dec_in, mask)
-                loss = F.nll_loss(dec_out, y[:, t], size_average = False, ignore_index = PAD_IDX)
+
+                if LABEL_SMOOTHING:
+                    eps = 0.1
+                    yy = y[:, t].contiguous().view(-1)
+                    n_class = dec_out.size(1)
+                    one_hot = torch.zeros_like(dec_out).scatter(1, yy.view(-1, 1), 1)
+                    one_hot = one_hot * (1 - eps) + (1 - one_hot) * eps / (n_class - 1)
+                    log_prb = F.log_softmax(dec_out, dim=1)
+                    non_pad_mask = yy.ne(PAD_IDX)
+                    loss = -(one_hot * log_prb).sum(dim=1)
+                    loss = loss.masked_select(non_pad_mask).sum()
+                else:
+                    loss = F.nll_loss(dec_out, y[:, t], size_average = False, ignore_index = PAD_IDX)
+
                 total_loss += loss.item()
                 loss.backward(retain_graph=True)
                 del loss
