@@ -1,10 +1,12 @@
 import sys
 import re
 import time
+import torch
 from model import *
 from utils import *
 from os.path import isfile
 from torch.autograd import Variable
+from gensim.models import FastText
 
 class NoamOpt:
     "Optim wrapper that implements rate."
@@ -83,6 +85,7 @@ def train():
     dec_optim = get_std_opt(dec)
     epoch = load_checkpoint(sys.argv[1], enc, dec) if isfile(sys.argv[1]) else 0
     filename = re.sub("\.epoch[0-9]+$", "", sys.argv[1])
+    fastText = FastText.load('wordvec/skipgram.model')
     print("training model...")
     
     for ei in range(epoch + 1, epoch + num_epochs + 1):
@@ -99,6 +102,9 @@ def train():
             mask = mask_pad(x)
             if VERBOSE:
                 pred = [[] for _ in range(BATCH_SIZE)]
+            
+            x = [src_itow[scalar(i)] for i in x[0]]
+            x = torch.stack(list(map(lambda xx: torch.from_numpy(fastText.wv[xx]), x)))
             enc_out = enc(x, mask)
             dec_in = LongTensor([SOS_IDX] * BATCH_SIZE).unsqueeze(1)
             for t in range(y.size(1)):

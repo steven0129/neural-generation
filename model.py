@@ -38,7 +38,8 @@ class encoder(nn.Module):
             self = self.cuda()
 
     def forward(self, x, mask):
-        x = self.embed(x)
+        x = x.view(BATCH_SIZE, -1, EMBED_SIZE)
+        x = x.cuda()
         h = x + self.pe(x.size(1))
         for layer in self.layers:
             h = layer(h, mask)

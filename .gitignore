@@ -7,3 +7,4 @@ predict.py
 test.py
 *.epoch*
 *.csv*
+wordvec/
