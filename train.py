@@ -8,6 +8,8 @@ from os.path import isfile
 from torch.autograd import Variable
 from gensim.models import FastText
 
+fastText = FastText.load_fasttext_format('wordvec/skipgram.bin')
+
 class NoamOpt:
     "Optim wrapper that implements rate."
     def __init__(self, model_size, factor, warmup, optimizer):
@@ -35,6 +37,12 @@ class NoamOpt:
 
 def get_std_opt(model):
     return NoamOpt(EMBED_SIZE, 2, 4000, torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
+
+def word2vec(x):
+    try:
+        return torch.from_numpy(fastText.wv[x])
+    except:
+        return torch.rand(512)
 
 def load_data():
     data = []
@@ -85,7 +93,7 @@ def train():
     dec_optim = get_std_opt(dec)
     epoch = load_checkpoint(sys.argv[1], enc, dec) if isfile(sys.argv[1]) else 0
     filename = re.sub("\.epoch[0-9]+$", "", sys.argv[1])
-    fastText = FastText.load('wordvec/skipgram.model')
+    
     print("training model...")
     
     for ei in range(epoch + 1, epoch + num_epochs + 1):
@@ -104,7 +112,7 @@ def train():
                 pred = [[] for _ in range(BATCH_SIZE)]
             
             x = [src_itow[scalar(i)] for i in x[0]]
-            x = torch.stack(list(map(lambda xx: torch.from_numpy(fastText.wv[xx]), x)))
+            x = torch.stack(list(map(word2vec, x)))
             enc_out = enc(x, mask)
             dec_in = LongTensor([SOS_IDX] * BATCH_SIZE).unsqueeze(1)
             for t in range(y.size(1)):
@@ -155,7 +163,7 @@ def train():
         else:
             if VERBOSE:
                 for x, y in zip(x, pred):
-                    print(" ".join([src_itow[scalar(i)] for i in x if scalar(i) != PAD_IDX]))
+                    # print(" ".join([src_itow[scalar(i)] for i in x if scalar(i) != PAD_IDX]))
                     print(" ".join([tgt_itow[i] for i in y if i != PAD_IDX]))
             save_checkpoint(filename, enc, dec, ei, loss_sum, timer)
 
