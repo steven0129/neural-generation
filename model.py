@@ -5,13 +5,13 @@ import torch.nn.functional as F
 
 BATCH_SIZE = 1
 EMBED_SIZE = 512
-NUM_LAYERS = 6
-NUM_HEADS = 8 # number of heads
+NUM_LAYERS = 1
+NUM_HEADS = 1 # number of heads
 DK = EMBED_SIZE // NUM_HEADS # dimension of key
 DV = EMBED_SIZE // NUM_HEADS # dimension of value
 DROPOUT = 0.1
 VERBOSE = True
-LABEL_SMOOTHING = True
+LABEL_SMOOTHING = False
 SAVE_EVERY = 1
 
 PAD = "<PAD>" # padding
