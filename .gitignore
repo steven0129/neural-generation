@@ -3,7 +3,6 @@ pair
 pair*
 __pycache__/
 log.txt
-test.py
 *.epoch*
 *.csv*
 wordvec/
