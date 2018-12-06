@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-BATCH_SIZE = 2
+BATCH_SIZE = 14
 EMBED_SIZE = 512
 NUM_LAYERS = 2
 NUM_HEADS = 1 # number of heads
@@ -114,12 +114,12 @@ class attn_mh(nn.Module): # multi-head attention
         super().__init__()
 
         # architecture
-        self.Wq = nn.Linear(EMBED_SIZE, NUM_HEADS * DK) # query
-        self.Wk = nn.Linear(EMBED_SIZE, NUM_HEADS * DK) # key for attention distribution
-        self.Wv = nn.Linear(EMBED_SIZE, NUM_HEADS * DV) # value for context representation
-        self.Wo = nn.Linear(NUM_HEADS * DV, EMBED_SIZE)
-        self.dropout = nn.Dropout(DROPOUT)
-        self.norm = nn.LayerNorm(EMBED_SIZE)
+        self.Wq = nn.DataParallel(nn.Linear(EMBED_SIZE, NUM_HEADS * DK)) # query
+        self.Wk = nn.DataParallel(nn.Linear(EMBED_SIZE, NUM_HEADS * DK)) # key for attention distribution
+        self.Wv = nn.DataParallel(nn.Linear(EMBED_SIZE, NUM_HEADS * DV)) # value for context representation
+        self.Wo = nn.DataParallel(nn.Linear(NUM_HEADS * DV, EMBED_SIZE))
+        self.dropout = nn.DataParallel(nn.Dropout(DROPOUT))
+        self.norm = nn.DataParallel(nn.LayerNorm(EMBED_SIZE))
 
     def attn_sdp(self, q, k, v, mask): # scaled dot-product attention
         c = np.sqrt(DK) # scale factor
@@ -146,12 +146,12 @@ class ffn(nn.Module): # position-wise feed-forward networks
 
         # architecture
         self.layers = nn.Sequential(
-            nn.Linear(EMBED_SIZE, d),
-            nn.ReLU(),
-            nn.Linear(d, EMBED_SIZE),
+            nn.DataParallel(nn.Linear(EMBED_SIZE, d)),
+            nn.DataParallel(nn.ReLU()),
+            nn.DataParallel(nn.Linear(d, EMBED_SIZE)),
         )
-        self.dropout = nn.Dropout(DROPOUT)
-        self.norm = nn.LayerNorm(EMBED_SIZE)
+        self.dropout = nn.DataParallel(nn.Dropout(DROPOUT))
+        self.norm = nn.DataParallel(nn.LayerNorm(EMBED_SIZE))
 
     def forward(self, x):
         z = self.layers(x)
