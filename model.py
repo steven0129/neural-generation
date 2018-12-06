@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-BATCH_SIZE = 14
+BATCH_SIZE = 28
 EMBED_SIZE = 512
 NUM_LAYERS = 2
 NUM_HEADS = 1 # number of heads
@@ -51,11 +51,11 @@ class decoder(nn.Module):
         super().__init__()
 
         # architecture
-        self.embed = nn.Embedding(vocab_size, EMBED_SIZE, padding_idx = PAD_IDX)
+        self.embed = nn.DataParallel(nn.Embedding(vocab_size, EMBED_SIZE, padding_idx = PAD_IDX), device_ids=DEVICES)
         self.pe = pos_encoder() # positional encoding
         self.layers = nn.ModuleList([nn.DataParallel(dec_layer(), device_ids=DEVICES) for _ in range(NUM_LAYERS)])
-        self.out = nn.Linear(EMBED_SIZE, vocab_size)
-        self.softmax = nn.LogSoftmax(1)
+        self.out = nn.DataParallel(nn.Linear(EMBED_SIZE, vocab_size), device_ids=DEVICES)
+        self.softmax = nn.DataParallel(nn.LogSoftmax(1), device_ids=DEVICES)
 
         if CUDA:
             self = self.cuda()
