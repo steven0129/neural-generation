@@ -111,8 +111,14 @@ def train():
             if VERBOSE:
                 pred = [[] for _ in range(BATCH_SIZE)]
             
-            x = [src_itow[scalar(i)] for i in x[0]]
-            x = torch.stack(list(map(word2vec, x)))
+            xx = []
+
+            for batch_idx in range(BATCH_SIZE):
+                tmp = [src_itow[scalar(i)] for i in x[batch_idx]]
+                xx.append(torch.stack(list(map(word2vec, tmp))))
+
+            x = torch.stack(xx)
+            
             enc_out = enc(x, mask)
             dec_in = LongTensor([SOS_IDX] * BATCH_SIZE).unsqueeze(1)
             for t in range(y.size(1)):
