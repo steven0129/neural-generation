@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-BATCH_SIZE = 28
+BATCH_SIZE = 14
 EMBED_SIZE = 512
 NUM_LAYERS = 2
 NUM_HEADS = 1 # number of heads
