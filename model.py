@@ -24,6 +24,7 @@ SOS_IDX = 2
 
 torch.manual_seed(1)
 CUDA = torch.cuda.is_available()
+DEVICES = [0, 1]
 
 class encoder(nn.Module):
     def __init__(self, vocab_size):
@@ -32,7 +33,7 @@ class encoder(nn.Module):
         # architecture
         self.embed = nn.Embedding(vocab_size, EMBED_SIZE, padding_idx = PAD_IDX)
         self.pe = pos_encoder() # positional encoding
-        self.layers = nn.ModuleList([enc_layer() for _ in range(NUM_LAYERS)])
+        self.layers = nn.ModuleList([nn.DataParallel(enc_layer(), device_ids=DEVICES) for _ in range(NUM_LAYERS)])
 
         if CUDA:
             self = self.cuda()
@@ -52,7 +53,7 @@ class decoder(nn.Module):
         # architecture
         self.embed = nn.Embedding(vocab_size, EMBED_SIZE, padding_idx = PAD_IDX)
         self.pe = pos_encoder() # positional encoding
-        self.layers = nn.ModuleList([dec_layer() for _ in range(NUM_LAYERS)])
+        self.layers = nn.ModuleList([nn.DataParallel(dec_layer(), device_ids=DEVICES) for _ in range(NUM_LAYERS)])
         self.out = nn.Linear(EMBED_SIZE, vocab_size)
         self.softmax = nn.LogSoftmax(1)
 
@@ -114,12 +115,12 @@ class attn_mh(nn.Module): # multi-head attention
         super().__init__()
 
         # architecture
-        self.Wq = nn.DataParallel(nn.Linear(EMBED_SIZE, NUM_HEADS * DK)) # query
-        self.Wk = nn.DataParallel(nn.Linear(EMBED_SIZE, NUM_HEADS * DK)) # key for attention distribution
-        self.Wv = nn.DataParallel(nn.Linear(EMBED_SIZE, NUM_HEADS * DV)) # value for context representation
-        self.Wo = nn.DataParallel(nn.Linear(NUM_HEADS * DV, EMBED_SIZE))
-        self.dropout = nn.DataParallel(nn.Dropout(DROPOUT))
-        self.norm = nn.DataParallel(nn.LayerNorm(EMBED_SIZE))
+        self.Wq = nn.Linear(EMBED_SIZE, NUM_HEADS * DK) # query
+        self.Wk = nn.Linear(EMBED_SIZE, NUM_HEADS * DK) # key for attention distribution
+        self.Wv = nn.Linear(EMBED_SIZE, NUM_HEADS * DV) # value for context representation
+        self.Wo = nn.Linear(NUM_HEADS * DV, EMBED_SIZE)
+        self.dropout = nn.Dropout(DROPOUT)
+        self.norm = nn.LayerNorm(EMBED_SIZE)
 
     def attn_sdp(self, q, k, v, mask): # scaled dot-product attention
         c = np.sqrt(DK) # scale factor
@@ -131,11 +132,11 @@ class attn_mh(nn.Module): # multi-head attention
 
     def forward(self, q, k, v, mask):
         x = q # identity
-        q = self.Wq(q).view(BATCH_SIZE, -1, NUM_HEADS, DK).transpose(1, 2)
-        k = self.Wk(k).view(BATCH_SIZE, -1, NUM_HEADS, DK).transpose(1, 2)
-        v = self.Wv(v).view(BATCH_SIZE, -1, NUM_HEADS, DV).transpose(1, 2)
+        q = self.Wq(q).view(int(BATCH_SIZE / len(DEVICES)), -1, NUM_HEADS, DK).transpose(1, 2)
+        k = self.Wk(k).view(int(BATCH_SIZE / len(DEVICES)), -1, NUM_HEADS, DK).transpose(1, 2)
+        v = self.Wv(v).view(int(BATCH_SIZE / len(DEVICES)), -1, NUM_HEADS, DV).transpose(1, 2)
         z = self.attn_sdp(q, k, v, mask)
-        z = z.transpose(1, 2).contiguous().view(BATCH_SIZE, -1, NUM_HEADS * DV)
+        z = z.transpose(1, 2).contiguous().view(int(BATCH_SIZE / len(DEVICES)), -1, NUM_HEADS * DV)
         z = self.Wo(z)
         z = self.norm(x + self.dropout(z)) # residual connection and dropout
         return z
@@ -146,12 +147,12 @@ class ffn(nn.Module): # position-wise feed-forward networks
 
         # architecture
         self.layers = nn.Sequential(
-            nn.DataParallel(nn.Linear(EMBED_SIZE, d)),
-            nn.DataParallel(nn.ReLU()),
-            nn.DataParallel(nn.Linear(d, EMBED_SIZE)),
+            nn.Linear(EMBED_SIZE, d),
+            nn.ReLU(),
+            nn.Linear(d, EMBED_SIZE),
         )
-        self.dropout = nn.DataParallel(nn.Dropout(DROPOUT))
-        self.norm = nn.DataParallel(nn.LayerNorm(EMBED_SIZE))
+        self.dropout = nn.Dropout(DROPOUT)
+        self.norm = nn.LayerNorm(EMBED_SIZE)
 
     def forward(self, x):
         z = self.layers(x)
