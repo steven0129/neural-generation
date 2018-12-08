@@ -60,8 +60,9 @@ class decoder(nn.Module):
         if CUDA:
             self = self.cuda()
 
-    def forward(self, enc_out, dec_in, mask2):
-        x = self.embed(dec_in)
+    def forward(self, enc_out, x, dec_in, mask2):
+        x = x.view(BATCH_SIZE, -1, EMBED_SIZE)
+        x = x.cuda()
         h = x + self.pe(x.size(1))
         mask1 = mask_triu(mask_pad(dec_in))
         for layer in self.layers:

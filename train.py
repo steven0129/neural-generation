@@ -112,17 +112,21 @@ def train():
                 pred = [[] for _ in range(BATCH_SIZE)]
             
             xx = []
+            y_embed = []
+            sos = ['<SOS>'] * BATCH_SIZE
 
             for batch_idx in range(BATCH_SIZE):
                 tmp = [src_itow[scalar(i)] for i in x[batch_idx]]
                 xx.append(torch.stack(list(map(word2vec, tmp))))
+                y_embed.append(word2vec(sos[batch_idx]))
 
             x = torch.stack(xx)
+            y_embed = torch.stack(y_embed).view(BATCH_SIZE, 1, EMBED_SIZE)
             
             enc_out = enc(x, mask)
             dec_in = LongTensor([SOS_IDX] * BATCH_SIZE).unsqueeze(1)
             for t in range(y.size(1)):
-                dec_out = dec(enc_out, dec_in, mask)
+                dec_out = dec(enc_out, y_embed, dec_in, mask)
 
                 if LABEL_SMOOTHING:
                     eps = 0.1
@@ -142,9 +146,13 @@ def train():
                 del loss
 
                 dec_in = torch.cat((dec_in, y[:, t].unsqueeze(1)), 1) # teacher forcing
-                if VERBOSE:
-                    for i, j in enumerate(dec_out.data.topk(1)[1]):
-                        pred[i].append(scalar(j))
+                pred_str = []
+                
+                for i, j in enumerate(dec_out.data.topk(1)[1]):
+                    pred_str.append(tgt_itow[scalar(j)])
+                    pred[i].append(scalar(j))
+
+                y_embed = torch.cat((y_embed, torch.stack(list(map(word2vec, pred_str))).view(BATCH_SIZE, 1, EMBED_SIZE)), 1)
                 
             total_loss /= y.data.gt(0).sum().float() # divide by the number of unpadded tokens
             enc_optim.step()
