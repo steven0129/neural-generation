@@ -108,8 +108,8 @@ def train():
             enc_optim.optimizer.zero_grad()
             dec_optim.optimizer.zero_grad()
             mask = mask_pad(x)
-            if VERBOSE:
-                pred = [[] for _ in range(BATCH_SIZE)]
+            # if VERBOSE:
+            #     pred = [[] for _ in range(BATCH_SIZE)]
             
             xx = []
             y_embed = []
@@ -121,7 +121,7 @@ def train():
                 y_embed.append(word2vec(sos[batch_idx]))
 
             x = torch.stack(xx)
-            y_embed = torch.stack(y_embed).view(BATCH_SIZE, 1, EMBED_SIZE)
+            y_embed = torch.stack(y_embed).view(BATCH_SIZE, 1, EMBED_SIZE).cuda()
             
             enc_out = enc(x, mask)
             dec_in = LongTensor([SOS_IDX] * BATCH_SIZE).unsqueeze(1)
@@ -146,14 +146,18 @@ def train():
                 del loss
 
                 dec_in = torch.cat((dec_in, y[:, t].unsqueeze(1)), 1) # teacher forcing
-                pred_str = []
+                # pred_str = []
+                pred = []
                 
                 for i, j in enumerate(dec_out.data.topk(1)[1]):
-                    pred_str.append(tgt_itow[scalar(j)])
-                    pred[i].append(scalar(j))
+                    # pred_str.append(tgt_itow[scalar(j)])
+                    pred.append(scalar(j))
 
-                y_embed = torch.cat((y_embed, torch.stack(list(map(word2vec, pred_str))).view(BATCH_SIZE, 1, EMBED_SIZE)), 1)
-                
+                vecs = list(map(lambda x: word2vec(tgt_itow[x]), pred))
+                y_embed = torch.cat((y_embed, torch.stack(vecs).view(BATCH_SIZE, 1, EMBED_SIZE).cuda()), 1)
+                del vecs
+                del pred
+
             total_loss /= y.data.gt(0).sum().float() # divide by the number of unpadded tokens
             enc_optim.step()
             dec_optim.step()
@@ -165,6 +169,7 @@ def train():
                 LOG.write(f'epoch = {ei}, iteration = {ii}, loss = {total_loss}\n')
             
             del total_loss
+            del y_embed
         
         timer = time.time() - timer
         loss_sum /= len(data)
@@ -175,10 +180,10 @@ def train():
         if ei % SAVE_EVERY and ei != epoch + num_epochs:
             save_checkpoint("", None, None, ei, loss_sum, timer)
         else:
-            if VERBOSE:
-                for x, y in zip(x, pred):
-                    # print(" ".join([src_itow[scalar(i)] for i in x if scalar(i) != PAD_IDX]))
-                    print(" ".join([tgt_itow[i] for i in y if i != PAD_IDX]))
+            # if VERBOSE:
+            #     for x, y in zip(x, pred):
+            #         # print(" ".join([src_itow[scalar(i)] for i in x if scalar(i) != PAD_IDX]))
+            #         print(" ".join([tgt_itow[i] for i in y if i != PAD_IDX]))
             save_checkpoint(filename, enc, dec, ei, loss_sum, timer)
 
 if __name__ == "__main__":

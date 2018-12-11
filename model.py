@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-BATCH_SIZE = 14
+BATCH_SIZE = 1
 EMBED_SIZE = 512
 NUM_LAYERS = 2
 NUM_HEADS = 1 # number of heads
@@ -133,11 +133,11 @@ class attn_mh(nn.Module): # multi-head attention
 
     def forward(self, q, k, v, mask):
         x = q # identity
-        q = self.Wq(q).view(int(BATCH_SIZE / len(DEVICES)), -1, NUM_HEADS, DK).transpose(1, 2)
-        k = self.Wk(k).view(int(BATCH_SIZE / len(DEVICES)), -1, NUM_HEADS, DK).transpose(1, 2)
-        v = self.Wv(v).view(int(BATCH_SIZE / len(DEVICES)), -1, NUM_HEADS, DV).transpose(1, 2)
+        q = self.Wq(q).view(BATCH_SIZE, -1, NUM_HEADS, DK).transpose(1, 2)
+        k = self.Wk(k).view(BATCH_SIZE, -1, NUM_HEADS, DK).transpose(1, 2)
+        v = self.Wv(v).view(BATCH_SIZE, -1, NUM_HEADS, DV).transpose(1, 2)
         z = self.attn_sdp(q, k, v, mask)
-        z = z.transpose(1, 2).contiguous().view(int(BATCH_SIZE / len(DEVICES)), -1, NUM_HEADS * DV)
+        z = z.transpose(1, 2).contiguous().view(BATCH_SIZE, -1, NUM_HEADS * DV)
         z = self.Wo(z)
         z = self.norm(x + self.dropout(z)) # residual connection and dropout
         return z
