@@ -3,9 +3,6 @@ from model import SOS, EOS, PAD, SOS_IDX, EOS_IDX, PAD_IDX
 from utils import tokenize
 from tqdm import tqdm
 
-MIN_LEN = 1
-MAX_LEN = 1300
-
 def load_data():
     data = []
     src_vocab = {PAD: PAD_IDX, EOS: EOS_IDX, SOS: SOS_IDX}
@@ -13,12 +10,12 @@ def load_data():
     fo = open(sys.argv[1])
     for line in tqdm(fo):
         src, tgt = line.split(",")
-        src_tokens = tokenize(src[:1211], 'word')
-        tgt_tokens = tokenize(tgt[:1211], 'word')
-        if len(src_tokens) < MIN_LEN or len(src_tokens) > MAX_LEN:
-            continue
-        if len(tgt_tokens) < MIN_LEN or len(tgt_tokens) > MAX_LEN:
-            continue
+        src_tokens = tokenize(src, 'word')
+        tgt_tokens = tokenize(tgt[:2000], 'word')
+        # if len(src_tokens) < MIN_LEN or len(src_tokens) > MAX_LEN:
+        #     continue
+        # if len(tgt_tokens) < MIN_LEN or len(tgt_tokens) > MAX_LEN:
+        #     continue
         src_seq = []
         tgt_seq = []
         for word in src_tokens:
@@ -31,6 +28,7 @@ def load_data():
             tgt_seq.append(str(tgt_vocab[word]))
         data.append((src_seq, tgt_seq))
     data.sort(key = lambda x: len(x[0]), reverse = True) # sort by source sequence length
+    data = filter(lambda x: len(x[0]) > 0, data)
     fo.close()
     return data, src_vocab, tgt_vocab
 

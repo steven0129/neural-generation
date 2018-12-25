@@ -5,7 +5,7 @@ import torch.nn.functional as F
 
 BATCH_SIZE = 1
 EMBED_SIZE = 512
-NUM_LAYERS = 6
+NUM_LAYERS = 3
 NUM_HEADS = 8 # number of heads
 DK = EMBED_SIZE // NUM_HEADS # dimension of key
 DV = EMBED_SIZE // NUM_HEADS # dimension of value
@@ -36,12 +36,16 @@ class encoder(nn.Module):
 
         if CUDA:
             self = self.cuda()
+            self.embed = self.embed.cpu()
 
     def forward(self, x, mask):
-        x = self.embed(x)
-        h = x + self.pe(x.size(1))
+        x = self.embed(x).half().cuda()
+        mask = mask.cuda()
+
+        h = (x + self.pe(x.size(1))).half()
         for layer in self.layers:
-            h = layer(h, mask)
+            h = layer(h, mask).half()
+            
         return h
 
 class decoder(nn.Module):
@@ -57,14 +61,18 @@ class decoder(nn.Module):
 
         if CUDA:
             self = self.cuda()
+            self.embed = self.embed.cpu()
 
     def forward(self, enc_out, dec_in, mask2):
-        x = self.embed(dec_in)
+        x = self.embed(dec_in).half().cuda()
+        dec_in = dec_in.half().cuda()
+        mask2 = mask2.cuda()
+
         h = x + self.pe(x.size(1))
         mask1 = mask_triu(mask_pad(dec_in))
         for layer in self.layers:
-            h = layer(enc_out, h, mask1, mask2)
-        h = self.out(h[:, -1])
+            h = layer(enc_out, h, mask1, mask2).half()
+        h = self.out(h[:, -1].float())
         y = self.softmax(h)
         return y
 
@@ -97,7 +105,7 @@ class dec_layer(nn.Module): # decoder layer
         return z
 
 class pos_encoder(nn.Module): # positional encoding
-    def __init__(self, maxlen = 1000):
+    def __init__(self, maxlen = 2000):
         super().__init__()
         self.pe = Tensor(maxlen, EMBED_SIZE)
         pos = torch.arange(0, maxlen, 1.).unsqueeze(1)
@@ -106,7 +114,7 @@ class pos_encoder(nn.Module): # positional encoding
         self.pe[:, 1::2] = torch.cos(pos * k)
 
     def forward(self, n):
-        return self.pe[:n]
+        return self.pe[:n].half()
 
 class attn_mh(nn.Module): # multi-head attention
     def __init__(self):
@@ -129,6 +137,10 @@ class attn_mh(nn.Module): # multi-head attention
         return a # attention weights
 
     def forward(self, q, k, v, mask):
+        q = q.float()
+        k = k.float()
+        v = v.float()
+
         x = q # identity
         q = self.Wq(q).view(BATCH_SIZE, -1, NUM_HEADS, DK).transpose(1, 2)
         k = self.Wk(k).view(BATCH_SIZE, -1, NUM_HEADS, DK).transpose(1, 2)
@@ -149,6 +161,7 @@ class ffn(nn.Module): # position-wise feed-forward networks
             nn.ReLU(),
             nn.Linear(d, EMBED_SIZE),
         )
+
         self.dropout = nn.Dropout(DROPOUT)
         self.norm = nn.LayerNorm(EMBED_SIZE)
 
@@ -163,7 +176,7 @@ def Tensor(*args):
 
 def LongTensor(*args):
     x = torch.LongTensor(*args)
-    return x.cuda() if CUDA else x
+    return x
 
 def scalar(x):
     return x.view(-1).data.tolist()[0]

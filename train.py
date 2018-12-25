@@ -102,7 +102,7 @@ def train():
             enc_out = enc(x, mask)
             dec_in = LongTensor([SOS_IDX] * BATCH_SIZE).unsqueeze(1)
             for t in range(y.size(1)):
-                dec_out = dec(enc_out, dec_in, mask)
+                dec_out = dec(enc_out, dec_in, mask).cpu()
 
                 if LABEL_SMOOTHING:
                     eps = 0.1
